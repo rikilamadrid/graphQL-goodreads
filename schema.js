@@ -1,6 +1,5 @@
 const fetch = require('node-fetch')
 const util = require('util')
-const parseXML = util.promisify(require('xml2js').parseString)
 const {
   GraphQLSchema,
   GraphQLInt,
@@ -8,7 +7,7 @@ const {
   GraphQLList,
   GraphQLObjectType
 } = require('graphql')
-
+const parseXML = util.promisify(require('xml2js').parseString)
 const API_KEY = 'x9xIwxSHi3jXtShlpcO1Q'
 
 const BookType = new GraphQLObjectType({
@@ -22,7 +21,9 @@ const BookType = new GraphQLObjectType({
         xml.title[0]
     },
     isbn: {
-      type: GraphQLString
+      type: GraphQLString,
+      resolve: xml =>
+        xml.isbn[0]
     }
   })
 })
@@ -40,7 +41,12 @@ const AuthorType = new GraphQLObjectType({
     books: {
       type: new GraphQLList(BookType),
       resolve: xml =>
-        xml.GoodreadsResponse.author[0].books[0]
+        const ids = xml.GoodreadsResponse.author[0].books[0].book.map(elem => elem.id[0]._)
+        return Promise.all(ids.map(id =>
+          fetch(`https://www.goodreads.com/book/show${id}.xml?&key=${API_KEY}`)
+          .then(response => response.text())
+          .then(parseXML)
+        ))
     }
   })
 })
